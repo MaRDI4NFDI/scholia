@@ -7,13 +7,16 @@
 
 {{ sparql_to_table('people') }}
 {{ sparql_to_table('proceedings') }}
+{{ sparql_to_table('presentations') }}
 {{ sparql_to_table('recent-publications') }}
 {{ sparql_to_table('related-events-people') }}
 {{ sparql_to_table('related-events-timelocation') }}
-{{ sparql_to_table('topic') }}
+{{ sparql_to_table('topic-scores') }}
+{{ sparql_to_table('uses') }}
 {{ sparql_to_iframe('co-authors') }}
 {{ sparql_to_iframe('timeline') }}
- 
+{{ sparql_to_table('sponsors') }}
+
 {% endblock %}
 
 
@@ -31,11 +34,15 @@
 <table class="table table-hover" id="people-table"></table>
 
 
-<h3 id="co-authors">Co-author graph</h3>
+<h3 id="co-authors">Co-author graph of people involved in the event</h3>
 
 <div class="embed-responsive embed-responsive-4by3">
     <iframe class="embed-responsive-item" id="co-authors-iframe"></iframe>
 </div>
+
+<h2 id="sponsors">Sponsors</h2>
+
+<table class="table table-hover" id="sponsors-table"></table>
 
 
 <h2 id="timeline">Timeline</h2>
@@ -45,9 +52,14 @@
 </div>
 
 
-<h2 id="table">Topic scores</h2>
+<h2 id="topics-scores">Topic scores</h2>
 
-<table class="table table-hover" id="topic-table"></table>
+<table class="table table-hover" id="topic-scores-table"></table>
+
+
+<h2 id="uses">Uses</h2>
+
+<table class="table table-hover" id="uses-table"></table>
 
 
 <h2>Works</h2>
@@ -63,6 +75,14 @@ Recent publications by organizers, speakers or participants of the event.
 Works published in the proceedings related to the event.
 
 <table class="table table-hover" id="proceedings-table"></table>
+
+
+<h3 id="presentations">Presentations</h3>
+
+Works (like talks, presentations, posters) presented at the event.
+
+<table class="table table-hover" id="presentations-table"></table>
+
 
 
 <h2>Related events</h2>

@@ -154,8 +154,11 @@ askQuery("{{ panel }}", `# tool: scholia
 	    var imageURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/" 
 	    imageURL += imageNameMd5[0] + "/" + imageNameMd5.slice(0,2) + "/"
 	    var filetype = imageName.match(/\.(\w+)$/);
-	    if (filetype[1] === "tif" || filetype[1] === "tiff") {
+      var extension = filetype[1].toLowerCase()
+	    if (extension === "tif" || extension === "tiff") {
 	      imageURL += encodeURIComponent(imageName) + "/lossy-page1-500px-" + encodeURIComponent(imageName) + ".jpg";
+	    } else if (extension === "svg") {
+	      imageURL += encodeURIComponent(imageName) + "/500px-" + encodeURIComponent(imageName) + ".png";
 	    } else {
 	      imageURL += encodeURIComponent(imageName) + "/500px-" + encodeURIComponent(imageName);
 	    }
@@ -184,6 +187,21 @@ askQuery("{{ panel }}", `# tool: scholia
 	     html += user.prefix + escapeHTML(user.name) + '</a>';
 	     detailsList.push(html);
 	 }
+
+	 function sortRank(a, b) {
+	  const aRank = a["rank"];
+	  const bRank = b["rank"];
+	  if (aRank == bRank) {
+	    return 0;
+	  }
+	  if (aRank == "preferred" || bRank == "deprecated") {
+	    return -1;
+	  }
+	  if (bRank == "preferred" || aRank == "deprecated") {
+	    return 1;
+	  }
+    return 0;
+	}
 
 	 var detailsList = Array();
 	 if ("P496" in item.claims) {
@@ -223,6 +241,13 @@ askQuery("{{ panel }}", `# tool: scholia
 	     var user = { name: item.claims.P2572[0].mainsnak.datavalue.value, prefix: '#' };
 	     var site = { name: "Hashtag hub", url: 'https://hashtags-hub.toolforge.org/' };
 	     socialMediaLink(detailsList, user, site);
+	 }
+
+	 /* Official homepage */
+	 if ("P856" in item.claims) {
+	     var homepage = item.claims.P856.sort(sortRank)[0]
+       var homepageURL = homepage.mainsnak.datavalue.value
+	     detailsList.push('&nbsp;<a href="' + homepageURL + '">' + homepageURL + '</a>');
 	 }
 
 	 if (detailsList.length > 0) {
@@ -319,7 +344,7 @@ askQuery("{{ panel }}", `# tool: scholia
 	             bioschemasAnnotation.smiles = smiles.replace("\"", "\'\'") ;
 		 }
 		 $( '#bioschemas' ).append( JSON.stringify(bioschemasAnnotation) );
-	     } catch(e) { console.log("Exception: " + e)
+	     } catch(e) { console.error("Exception: " + e)
 	     }
 	 } else if (item.claims.P352) { // UniProt ID
 	     try { /* Protein */
@@ -336,7 +361,7 @@ askQuery("{{ panel }}", `# tool: scholia
 	       bioschemasAnnotation.name = item.labels.en.value;
          }
 		 $( '#bioschemas' ).append( JSON.stringify(bioschemasAnnotation) );
-	     } catch(e) { console.log("Exception: " + e)
+	     } catch(e) { console.error("Exception: " + e)
 	     }
 	 } else if (item.claims.P351 || item.claims.P594) { // NCBI Gene or Ensembl
 	     try { /* Gene */
@@ -362,7 +387,7 @@ askQuery("{{ panel }}", `# tool: scholia
 	             bioschemasAnnotation.sameAs[counter] = "http://identifiers.org/ensembl/" + ensembl;
 		 }
 		 $( '#bioschemas' ).append( JSON.stringify(bioschemasAnnotation) );
-	     } catch(e) { console.log("Exception: " + e)
+	     } catch(e) { console.error("Exception: " + e)
 	     }
 	 }
 	 
@@ -381,7 +406,9 @@ askQuery("{{ panel }}", `# tool: scholia
 	       var html = " (<a href=\"" + wikipediaUrl + "\">Read more on English Wikipedia</a>)";
 		 $("#intro").text(data.extract).append(html);
 	     }).catch(error => {
-		 console.error('Error:', error);
+		 var html = "<a href=\"" + wikipediaUrl + "\">View on English Wikipedia</a>";
+         $("#intro").append(html);
+		 console.error('Could not get summary from enwiki: ', error);
 	     });
 	 }
 
@@ -406,6 +433,8 @@ askQuery("{{ panel }}", `# tool: scholia
 		 }
 		 $("#wikiversity-extract").text(text).append(html);
 	     }).fail(function(d, textStatus, error) {
+		 var html = "Read on the <a href=\"" + wikiversityUrl + "\">English Wikiversity</a>";
+		 $("#wikiversity-extract").append(html);
 		 console.error("getJSON failed, status: " + textStatus + ", error: "+error)
 	     });
 	 }
@@ -521,8 +550,12 @@ askQuery("{{ panel }}", `# tool: scholia
             if (data.results.bindings.length > 1) {
               addDropdownList("aspect-chooser", 'aspectMenuList', currentSubAspect, data)
             }
-          })
+          }).fail(function (jqXHR, textStatus, errorThrown) {
+            console.error("Subaspect chooser failed to generate. " + textStatus + " " + errorThrown)
+          });
         }
+      }).fail(function (jqXHR, textStatus, errorThrown) {
+        console.error("Aspect chooser failed to generate. " + textStatus + " " + errorThrown)
       });
 
       function createDropdownButton(parent, id, currentAspect, data, q) {        
@@ -614,7 +647,10 @@ askQuery("{{ panel }}", `# tool: scholia
 		 });
 	     });
 	     $( '#wembedder' ).append( '<hr>' );
-	 }
+	 },
+	 error: function (jqXHR, textStatus, errorThrown) {
+         console.error("Wembedder failed. " + textStatus + " " + errorThrown)
+	 },
      });
   {% endif %}
 
@@ -663,6 +699,9 @@ askQuery("{{ panel }}", `# tool: scholia
             } else {
               callback([])
             }
+          }).fail(function (jqXHR, textStatus, errorThrown) {
+            callback(["Search failed"])
+            console.error("Search failed. " + textStatus + " " + errorThrown)
           });
         }, 200)
       }
@@ -876,6 +915,7 @@ askQuery("{{ panel }}", `# tool: scholia
       <a class="dropdown-item" href="{{ url_for('app.show_chemical_element_index') }}">Chemical element</a>
       <a class="dropdown-item" href="{{ url_for('app.show_chemical_class_index') }}">Chemical class</a>
       <a class="dropdown-item" href="{{ url_for('app.show_lexeme_index') }}">Lexeme</a>
+      <a class="dropdown-item" href="{{ url_for('app.show_ontology_index') }}">Ontology</a>
       <a class="dropdown-item" href="{{ url_for('app.show_software_index') }}">Software</a>
       <a class="dropdown-item" href="{{ url_for('app.show_use_index') }}">Use</a>
     </div>

@@ -1,11 +1,23 @@
 #defaultView:BarChart
-select ?year (count(?work) as ?number_of_publications) where {
-  select ?work (min(?years) as ?year) where {
-    ?work wdt:P577 ?dates ;
-          p:P2860 / pq:P3712 / wdt:P31 wd:Q96471816 .
-    bind(str(year(?dates)) as ?years) .
+select ?year (count(?work) as ?number_of_publications) ?role where {
+  {
+    select ?work (min(?years) as ?year) ?type_ ?venue where {
+      ?work wdt:P577 ?dates ;
+            p:P2860 / pq:P3712 / wdt:P31 wd:Q96471816 .
+      bind(str(year(?dates)) as ?years) .
+      OPTIONAL {
+        ?work wdt:P31 wd:Q109229154 . bind("explicit" as ?type_)
+        ?work wdt:P1433 / rdfs:label ?venue . FILTER (LANG(?venue) = "en")
+      }
+    }
+    group by ?work ?type_ ?venue
   }
-  group by ?work
+  bind(
+    coalesce(
+      if(bound(?type_), ?venue,
+      'other source')
+    ) as ?role
+  )
 }
-group by ?year
+group by ?year ?role
 order by ?year

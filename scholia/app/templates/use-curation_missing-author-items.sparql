@@ -17,6 +17,7 @@ WITH {
   SELECT DISTINCT ?work WHERE {
     ?work (wdt:P2283 | wdt:P4510) / wdt:P279* wd:{{ q }} .
   }
+  LIMIT 100000
 } AS %works
 WITH {
   SELECT
@@ -39,6 +40,7 @@ WITH {
         [] wdt:P2093 ?author ;
            (wdt:P2283 | wdt:P4510) / wdt:P279* wd:{{ q }} .
       }
+      LIMIT 10000
     }
     UNION
     {
@@ -47,6 +49,7 @@ WITH {
         [] wdt:P2860 / wdt:P2093 ?author ;
            (wdt:P2283 | wdt:P4510) / wdt:P279* wd:{{ q }} .
       }
+      LIMIT 10000
     }
   }
   GROUP BY ?author
@@ -59,5 +62,5 @@ WHERE {
   # Label the result
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en" . }
 }
-ORDER BY DESC(?count) DESC(?score)
+ORDER BY DESC(?score) DESC(?count) 
 LIMIT 500

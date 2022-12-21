@@ -151,7 +151,7 @@ function convertDataTableData(data, columns) {
 	}
 	convertedData.push(convertedRow);
     }
-    return { data: convertedData, columns: convertedColumns }
+    return { data: convertedData, columns: convertedColumns };
 }
 
 
@@ -161,32 +161,49 @@ function entityToLabel(entity, language = 'en') {
     }
 
     // Fallback
-    languages = ['en', 'da', 'de', 'es', 'fr', 'jp',
+    var languages = ['en', 'da', 'de', 'es', 'fr', 'jp',
         'nl', 'no', 'ru', 'sv', 'zh'];
-    for (lang in languages) {
+    for (var lang in languages) {
         if (lang in entity['labels']) {
             return entity['labels'][lang].value;
         }
     }
 
     // Last resort
-    return entity['id']
+    return entity['id'];
 }
 
 
 function resize(element) {
     //width = document.getElementById("topics-works-matrix").clientWidth;
-    width = $(element)[0].clientWidth;
+    var width = $(element)[0].clientWidth;
     d3.select(element).attr("width", width);
     console.log("resized with width " + width);
 }
 
+function addReloadButton(element, callback) {    
+    var heading = element.previousElementSibling;
+
+    var button = document.createElement('button');
+    button.classList = 'btn btn-outline-secondary float-right';
+    button.innerHTML = 'Reload';
+    button.id = element.id + "-reload";
+    button.addEventListener('click', callback);
+    if (['H2', 'H3', 'H4'].includes(heading.tagName)) {
+        button.classList = 'btn btn-outline-secondary float-right';
+        heading.append(button);
+    } else {
+        button.classList = 'btn btn-outline-secondary d-block ml-auto';
+        button.style = 'clear: both';
+        element.insertAdjacentElement('beforebegin', button);
+    }
+}
 
 function sparqlToResponse(sparql, doneCallback) {
     var endpointUrl = "https://query.wikidata.org/bigdata/namespace/wdq/sparql";
     var settings = {
         headers: { Accept: "application/sparql-results+json" },
-        data: { query: sparql }
+        data: { query: sparql },
     };
     return $.ajax(endpointUrl, settings).then(doneCallback);
 }
@@ -195,7 +212,7 @@ function sparqlToResponse(sparql, doneCallback) {
 function sparqlDataToSimpleData(response) {
     // Convert long JSON data from from SPARQL endpoint to short form
     let data = response.results.bindings;
-    let columns = response.head.vars
+    let columns = response.head.vars;
     var convertedData = [];
     for (var i = 0; i < data.length; i++) {
         var convertedRow = {};
@@ -219,22 +236,22 @@ function sparqlToDataTablePost(sparql, element, filename, options = {}) {
     $.post(url, data = { query: sparql }, function (response, textStatus) {
         var simpleData = sparqlDataToSimpleData(response);
 
-        convertedData = convertDataTableData(simpleData.data, simpleData.columns);
-        columns = [];
-        for (i = 0; i < convertedData.columns.length; i++) {
+        var convertedData = convertDataTableData(simpleData.data, simpleData.columns);
+        var columns = [];
+        for (var i = 0; i < convertedData.columns.length; i++) {
             var column = {
                 data: convertedData.columns[i],
                 title: capitalizeFirstLetter(convertedData.columns[i]).replace(/_/g, "&nbsp;"),
                 defaultContent: "",
-            }
-            columns.push(column)
+            };
+            columns.push(column);
         }
 	
         if (convertedData.data.length <= 10) {
           paging = false;
         }
 
-        $(element).html('');
+        $(element).html(''); // remove loader
 
         var table = $(element).DataTable({
             data: convertedData.data,
@@ -257,7 +274,7 @@ function sparqlToDataTablePost(sparql, element, filename, options = {}) {
                 '</a></span></caption>'
         );
     }, "json");
-};
+}
 
 
 function sparqlToDataTable(sparql, element, filename, options = {}) {
@@ -276,87 +293,137 @@ function sparqlToDataTable(sparql, element, filename, options = {}) {
         '">' +
         filename.replace('_', ': ') +
         '</a></span></caption>';
-
-    $(element).html("<div class='loader'><div></div><div></div><div></div></div>")
     $(element).append(datatableFooter);
 
-    $.getJSON(url, function (response) {
-        var simpleData = sparqlDataToSimpleData(response);
+    const table = document.getElementById(element.slice(1));
+    addReloadButton(table, makeRequest);
 
-        convertedData = convertDataTableData(simpleData.data, simpleData.columns);
-        columns = [];
-        for (i = 0; i < convertedData.columns.length; i++) {
-            var column = {
-                data: convertedData.columns[i],
-                title: capitalizeFirstLetter(convertedData.columns[i]).replace(/_/g, "&nbsp;"),
-                defaultContent: "",
-            }
-            if (column['title'] == 'Count') {
-              // check that the count is not a link
-              if (convertedData.data[0]["count"][0] != "<") {
-                column['render'] = $.fn.dataTable.render.number(',', '.');
-              }
-              if (i == 0) {
-                column['className'] = 'dt-right';
-              }
-            } else if (
-              column['title'] == 'Score' ||
-              column['title'] == 'Distance' ||
-              /\Wper\W/.test(column['title'])
-            ) {
-              column['render'] = $.fn.dataTable.render.number(',', '.', 2);
-            }
-            columns.push(column);
-        }
-	
-        if (convertedData.data.length <= 10) {
-            paging = false;
+    makeRequest();
+
+    function makeRequest() {
+        if ($.fn.dataTable.isDataTable(element)) {
+            // unnecessary to clear the data here but better UX to make it clear 
+            // that we are reloading the data.
+            $(element).DataTable().clear().draw();
         }
 
-        $(element).html(""); // remove loader
-
-        var table = $(element).DataTable({ 
-            data: convertedData.data,
-            columns: columns,
-            lengthMenu: [[10, 25, 100, -1], [10, 25, 100, "All"]],
-            ordering: true,
-            order: [],
-            paging: paging,
-            sDom: sDom,
-            scrollX: false,
-            language: {
-              emptyTable: "This query yielded no results. ",
-              sZeroRecords: "This query yielded no results."
-            }
-        });
-
-        $(element).append(datatableFooter);
-    }).fail(function () {
-        $(element).prepend(
-            '<p>This query has timed out, we recommend that you follow the link to the Wikidata Query Service below to modify the query to be less intensive. </p> '
+        const loaderID = element.slice(1) + '-loader';
+        table.insertAdjacentHTML('beforebegin',
+            "<div id='" +
+                loaderID +
+                "' class='loader'><div></div><div></div><div></div></div>"
         );
-    });
-};
+
+        
+        $.getJSON(url, function (response) {
+            var simpleData = sparqlDataToSimpleData(response);
+
+            var convertedData = convertDataTableData(simpleData.data, simpleData.columns);
+            var columns = [];
+            if (convertedData.data.length > 0) {
+                for (i = 0; i < convertedData.columns.length; i++) {
+                    var column = {
+                        data: convertedData.columns[i],
+                        title: capitalizeFirstLetter(convertedData.columns[i]).replace(/_/g, "&nbsp;"),
+                        defaultContent: "",
+                    };
+                    if (column['title'] == 'Count') {
+                    // check that the count is not a link
+                    if (convertedData.data[0]["count"][0] != "<") {
+                        column['render'] = $.fn.dataTable.render.number(',', '.');
+                    }
+                    if (i == 0) {
+                        column['className'] = 'dt-right';
+                    }
+                    } else if (
+                    column['title'] == 'Score' ||
+                    column['title'] == 'Distance' ||
+                    /\Wper\W/.test(column['title'])
+                    ) {
+                    column['render'] = $.fn.dataTable.render.number(',', '.', 2);
+                    }
+                    columns.push(column);
+                }
+
+                if (convertedData.data.length <= 10) {
+                    paging = false;
+                }
+
+                $("#" + loaderID).remove(); // remove loader
+
+                if ($.fn.dataTable.isDataTable(element)) {
+                    // $(element).DataTable().clear();
+                    $(element).DataTable().rows.add(convertedData.data).draw();
+                } else {
+                    $(element).DataTable({
+                        data: convertedData.data,
+                        columns: columns,
+                        lengthMenu: [
+                            [10, 25, 100, -1],
+                            [10, 25, 100, 'All'],
+                        ],
+                        ordering: true,
+                        order: [],
+                        paging: paging,
+                        sDom: sDom,
+                        scrollX: false,
+                        language: {
+                            emptyTable: 'This query yielded no results. ',
+                            sZeroRecords: 'This query yielded no results.',
+                        },
+                    });
+                }
+            } else {
+                $('#' + loaderID).remove(); // remove loader
+
+                if (!$.fn.dataTable.isDataTable(element)) {
+                    $(element).DataTable({
+                        data: [],
+                        lengthChange: false,
+                        searching: false,
+                        paging: false,
+                        ordering: true,
+                        order: [],
+                        sDom: sDom,
+                        scrollX: false,
+                        language: {
+                            emptyTable: 'This query yielded no results. ',
+                            sZeroRecords: 'This query yielded no results.',
+                        },
+                    });
+                }
+            }
+        }).fail(function () {
+            $('#' + loaderID).remove(); // remove loader
+            $(element).prepend(
+                '<p>This query has timed out, we recommend that you follow the link to the Wikidata Query Service below to modify the query to be less intensive. </p> '
+            );
+            const reloadButton = document.getElementById(element.slice(1) + '-reload');
+            reloadButton.classList.add('btn-secondary');
+            reloadButton.classList.remove('btn-outline-secondary');
+        });
+    }
+}
 
 
 function sparqlToIframe(sparql, element, filename) {
-    let $iframe = $(element)
-    url = "https://query.wikidata.org/embed.html#" + encodeURIComponent(sparql);
+    let $iframe = $(element);
+    var url = "https://query.wikidata.org/embed.html#" + encodeURIComponent(sparql);
     $iframe.attr('src', url);
     $iframe.attr('loading', 'lazy');
 
-    const wikidata_sparql = "https://query.wikidata.org/sparql?query=" + encodeURIComponent(sparql)
-    const wikidata_query = "https://query.wikidata.org/#" + encodeURIComponent(sparql)
+    const wikidata_sparql = "https://query.wikidata.org/sparql?query=" + encodeURIComponent(sparql);
+    const wikidata_query = "https://query.wikidata.org/#" + encodeURIComponent(sparql);
 
     $.ajax({
         url: wikidata_sparql,
         success: function (data) {
             let $xml = $(data);
-            let results = $xml.find('results')
+            let results = $xml.find('results');
             if (results.text().trim().length === 0) {
-                $iframe.parent().css("display", "none")
+                $iframe.parent().css("display", "none");
                 $iframe.parent().after('<hr><p>This query yielded no results. You can still try to find something by ' +
-                    '<a href="' + wikidata_query + '" target="_blank">modifying it</a>.</p>')
+                    '<a href="' + wikidata_query + '" target="_blank">modifying it</a>.</p>');
             }
             $iframe.parent().after(
                 '<span style="float:right; font-size:smaller">' +
@@ -365,9 +432,12 @@ function sparqlToIframe(sparql, element, filename) {
                     '</a>' +
                 '</span>'
             );
-        }
-    })
-};
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+            console.error(filename + " iFrame query failed. " + textStatus + " " + errorThrown)
+        },
+    });
+}
 
 
 function sparqlToMatrix(sparql, element, filename){
@@ -392,7 +462,7 @@ function sparqlToMatrix(sparql, element, filename){
    
         // Sizes
         var margin = { top: 100, right: 0, bottom: 0, left: 0 },
-            width = $(element)[0].clientWidth
+            width = $(element)[0].clientWidth,
             axis_height = works.length * 12,
             full_height = axis_height + margin.top;
    
@@ -427,7 +497,7 @@ function sparqlToMatrix(sparql, element, filename){
         var yScale = d3
             .scaleBand()
             .range([0, axis_height])
-            .domain(works)
+            .domain(works);
    
         svg
             .append("g")
@@ -443,11 +513,11 @@ function sparqlToMatrix(sparql, element, filename){
                 })
             )
    
-        // Move y-label slight to the right so the first lette is not cut
+        // Move y-label slight to the right so the first letter is not cut
             .selectAll("text")
-            .attr("x", 1)
+            .attr("x", 1);
    
-        svg.selectAll("g .domain").remove()
+        svg.selectAll("g .domain").remove();
    
         // Tooltip
         var tooltip = d3
@@ -462,7 +532,7 @@ function sparqlToMatrix(sparql, element, filename){
             .style("font-size", "16px");
    
         var mouseover = function(d) {
-            html =
+            var html =
             "<a href='../work/" +
             d.work.value.substring(31) +
             "'>" +
@@ -529,10 +599,10 @@ function sparqlToPathWayPageViewer(sparql, filename){
 
     $(document).ready(function() {
         // Hide optional sections until data values are confirmed and ready
-        var organismSection = document.getElementById("Organism")                                                                                         
+        var organismSection = document.getElementById("Organism");
         organismSection.style.display = "none"; 
       
-        var pathwayViewerSection = document.getElementById("pathway-viewer")                                                                                
+        var pathwayViewerSection = document.getElementById("pathway-viewer");
         pathwayViewerSection.style.display = "none"; 
       
         // Check for optional data values and then use them if available
@@ -545,7 +615,7 @@ function sparqlToPathWayPageViewer(sparql, filename){
             $("#description").text(dataValues.pathwayDescription);
           }
           if ("organism" in dataValues) {
-            organismScholia = dataValues.organism.replace("http://www.wikidata.org/entity/","https://scholia.toolforge.org/taxon/")
+            var organismScholia = dataValues.organism.replace("http://www.wikidata.org/entity/","https://scholia.toolforge.org/taxon/");
             $("#Organism").after('<a href="' + organismScholia + '">' +
                      escapeHTML(dataValues.organismLabel) +
                      '</a>'); 
@@ -568,13 +638,12 @@ function sparqlToPathWayPageViewer(sparql, filename){
           }
         });
       });
-
 }
 
 
 function sparqlToShortInchiKey(sparql, key,  element, filename) {
-    shortkey = key.substring(0,14)
-    new_sparql = sparql.replace("_shortkey_",shortkey)
+    var shortkey = key.substring(0,14);
+    var new_sparql = sparql.replace("_shortkey_",shortkey);
     sparqlToDataTable(new_sparql, element, filename);
 }
 
@@ -582,7 +651,7 @@ function sparqlToShortInchiKey(sparql, key,  element, filename) {
 function askQuery(panel, askQuery, callback) {
      var endpointUrl = 'https://query.wikidata.org/sparql';
      
-     settings = {
+     var settings = {
        headers: { Accept: 'application/sparql-results+json' },
        data: { query: askQuery },
      };
@@ -596,8 +665,15 @@ function askQuery(panel, askQuery, callback) {
             // hide from table of contents
             var headings = document.querySelectorAll("#" + panel + " h2, #" + panel + " h3");
             for (var elem of headings) {
-                document.querySelector("li a[href='#" + elem.id + "']").parentElement.classList.add("d-none")
+                document.querySelector("li a[href='#" + elem.id + "']").parentElement.classList.add("d-none");
             }
         }
-    });
+     }).fail(function (jqXHR, textStatus, errorThrown) {
+        // hide from table of contents
+        var headings = document.querySelectorAll("#" + panel + " h2, #" + panel + " h3");
+        for (var elem of headings) {
+            document.querySelector("li a[href='#" + elem.id + "']").parentElement.classList.add("d-none");
+        }
+        console.error("Ask query failed. " + textStatus + " " + errorThrown)
+     });
 }

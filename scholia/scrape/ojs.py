@@ -33,7 +33,7 @@ import requests
 
 from ..qs import paper_to_quickstatements
 from ..query import iso639_to_q, issn_to_qs
-from ..utils import escape_string
+from ..utils import escape_string, pages_to_number_of_pages
 
 
 USER_AGENT = 'Scholia'
@@ -125,36 +125,6 @@ def issue_url_to_quickstatements(url, iso639=None):
     for paper_url in paper_urls:
         qs += paper_url_to_quickstatements(paper_url, iso639=iso639) + "\n"
     return qs
-
-
-def pages_to_number_of_pages(pages):
-    """Compute number of pages based on pages represented as string.
-
-    Parameters
-    ----------
-    pages : str
-        Pages represented as a string.
-
-    Returns
-    -------
-    number_of_pages : int or None
-        Number of pages returned as an integer. If the conversion is not
-        possible then None is returned.
-
-    Examples
-    --------
-    >>> pages_to_number_of_pages('61-67')
-    7
-
-    """
-    number_of_pages = None
-    page_elements = pages.split('-')
-    if len(page_elements) == 2:
-        try:
-            number_of_pages = int(page_elements[1]) - int(page_elements[0]) + 1
-        except ValueError:
-            pass
-    return number_of_pages
 
 
 def paper_to_q(paper):
@@ -320,8 +290,8 @@ def scrape_paper_from_url(url):
             content = _field_to_content(field)
             if content is not None and content != '':
                 return content
-        else:
-            return None
+
+        return None
 
     entry = {'url': url}
 
@@ -373,11 +343,17 @@ def scrape_paper_from_url(url):
     else:
         pages = _field_to_content('DC.Identifier.pageNumber')
     if pages is not None:
-        entry['pages'] = pages
-
         number_of_pages = pages_to_number_of_pages(pages)
         if number_of_pages is not None:
             entry['number_of_pages'] = number_of_pages
+
+        pages_parts = pages.split('-')
+        if len(pages_parts) == 2 and pages_parts[0] == pages_parts[1]:
+            # One-page publication
+            entry['pages'] = pages_parts[0]
+        else:
+            # Multiple pages
+            entry['pages'] = pages
 
     pdf_url = _field_to_content('citation_pdf_url')
     if pdf_url is not None:
